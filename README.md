@@ -37,8 +37,9 @@ sudo pacman -Syu   # sync first, or headers may 404
 **2. libfreenect2** (AUR `libfreenect2-git` needs two fixes on current toolchains: CMake 4 rejects its old minimum version, and a local variable clashes with a macro in newer OpenCL headers)
 
 ```bash
-yay -S libfreenect2-git   # fails at build; leaves the sources in place
+yay -S libfreenect2-git   # fails (CMake 4); it only fetches the PKGBUILD and sources
 cd ~/.cache/yay/libfreenect2-git
+CMAKE_POLICY_VERSION_MINIMUM=3.5 makepkg -f   # fails at the OpenCL error; expected
 grep -rl CL_ICDL_VERSION src/libfreenect2/src | xargs sed -i 's/CL_ICDL_VERSION/ICDL_VERSION_LOCAL/g'
 CMAKE_POLICY_VERSION_MINIMUM=3.5 makepkg -ef
 sudo pacman -U libfreenect2-git-*.pkg.tar.zst
