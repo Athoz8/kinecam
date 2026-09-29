@@ -1,173 +1,140 @@
-# OpenKinect v2
+# OpenKinect v2 (tray edition)
 
-Complete Xbox Kinect v2 support for Linux - camera, audio, and everything in between.
+Use an Xbox One Kinect (v2) on Linux as virtual webcams and a boosted microphone. A tray icon starts and stops everything, and stopping powers the sensor down (IR and logo LEDs off).
 
-## 🎯 What This Project Does
+Fork of [BenGWeeks/openkinect-v2](https://github.com/BenGWeeks/openkinect-v2), which provides the original RGB-only `kinect2v4l2` streamer, the audio test scripts and the hardware notes. Built on [libfreenect2](https://github.com/OpenKinect/libfreenect2) and [v4l2loopback](https://github.com/umlaeute/v4l2loopback).
 
-This project provides **complete Linux support** for Xbox Kinect v2, filling the gaps left by existing drivers:
+## Features
 
-- ✅ **Easy webcam setup** - Works with Zoom, Teams, OBS out-of-the-box
-- ✅ **Software beamforming** - Directional audio with the 4-mic array
-- ✅ **Audio enhancement** - Noise suppression, gain control, voice focus
-- ✅ **Simple installation** - One-command setup with systemd integration
-- ✅ **Real-time processing** - Low latency for video calls and streaming
+| Device | Node | Size | Content |
+|---|---|---|---|
+| Kinect RGB | `/dev/video10` | 1920x1080 | Color camera |
+| Kinect Depth | `/dev/video11` | 512x424 | Viridis colormap, adaptive range (3rd to 97th percentile), temporal smoothing, flicker removal |
+| Kinect Cloud | `/dev/video12` | 640x480 | Colored point cloud, slow rocking view (±0.5 rad around a pivot 1 m out) |
+| Kinect IR | `/dev/video13` | 512x424 | Infrared, adaptive brightness |
+| Kinect Mic | PipeWire source | mono 16 kHz | 4 mics mixed with gain, much louder than the raw device |
 
-## 🚀 Quick Start
+- One process (`camera/kinect2v4l2_multi`) feeds all cameras, since only one program can open the Kinect at a time. Depth uses the OpenCL pipeline (about 800 Hz on a GTX 1060 vs about 10 Hz on CPU).
+- `tray/kinect-tray.py` (PyQt6): green icon = streaming, grey = stopped. Click toggles, menu has Start/Stop and Quit.
+- Skeleton tracking is not included (libfreenect2 has none).
 
-```bash
-# Clone and install
-git clone https://github.com/BenGWeeks/openkinect-v2.git
-cd openkinect-v2
-./install.sh
+## Requirements
 
-# Start using Kinect as webcam
-openkinect-v2 start
+- Kinect v2 with its adapter, on a USB 3.0 port
+- NVIDIA GPU with OpenCL (tested: GTX 1060; CUDA not needed)
+- v4l2loopback, kernel headers matching your running kernel, PipeWire, Python 3, PyQt6
+- Tested on CachyOS (Arch), KDE Plasma, Wayland. Other distros should work but are untested.
 
-# Launch Zoom with Kinect
-openkinect-v2 zoom
-```
+## Install (Arch / CachyOS)
 
-## 📸 Camera Features
-
-- **1080p video** at 30fps
-- **Direct V4L2 output** - no CPU-heavy conversions
-- **Automatic service** - starts on boot
-- **Works everywhere** - Zoom, Teams, Chrome, Firefox, OBS
-
-## 🎙️ Audio Features
-
-### Current (Basic USB Audio)
-- 4-channel raw audio capture
-- Very quiet (-20dB vs Windows)
-- No directional processing
-
-### Coming Soon (Software Beamforming)
-- **Directional audio** - focus on speaker, reject noise
-- **Auto gain** - normalizes quiet Kinect audio
-- **Noise suppression** - reduces background sounds
-- **Voice tracking** - follows active speaker
-- **Low latency** - <20ms processing delay
-
-## 📋 Requirements
-
-### Hardware Setup
-
-```mermaid
-graph LR
-    PC[PC<br/>USB 3.0] -->|USB Cable| ADAPTER[Kinect<br/>Adapter]
-    ADAPTER -->|Proprietary| KINECT[Kinect v2]
-    POWER[Power<br/>Supply] --> ADAPTER
-    
-    style PC fill:#4169E1,stroke:#333,stroke-width:2px,color:#fff
-    style ADAPTER fill:#90EE90,stroke:#333,stroke-width:2px,color:#000
-    style KINECT fill:#FFB6C1,stroke:#333,stroke-width:2px,color:#000
-    style POWER fill:#FFD700,stroke:#333,stroke-width:2px,color:#000
-```
-
-### Hardware Requirements
-- Xbox Kinect v2 (Xbox One version)
-- Official Kinect Adapter for Windows (provides power)
-- USB 3.0 port (blue port, rear panel preferred)
-
-### Software
-- Linux kernel 4.4+ (Ubuntu 20.04+ recommended)
-- libfreenect2
-- v4l2loopback
-- JACK audio (for beamforming)
-
-## 🔧 Installation
+**1. Packages** (use your kernel's headers, e.g. `linux-cachyos-headers`; check with `uname -r`)
 
 ```bash
-# Install dependencies
-sudo apt install libfreenect2-dev v4l2loopback-dkms jackd2
-
-# Clone repository
-git clone https://github.com/BenGWeeks/openkinect-v2.git
-cd openkinect-v2
-
-# Run installer
-./install.sh
-
-# Enable service
-sudo systemctl enable openkinect-v2
-sudo systemctl start openkinect-v2
+sudo pacman -S --needed base-devel cmake v4l2loopback-dkms python-pyqt6 opencl-nvidia
+sudo pacman -Syu   # sync first, or headers may 404
 ```
 
-## 📁 Project Structure
+**2. libfreenect2** (AUR `libfreenect2-git` needs two fixes on current toolchains: CMake 4 rejects its old minimum version, and a local variable clashes with a macro in newer OpenCL headers)
 
-```
-openkinect-v2/
-├── camera/          # Webcam functionality
-├── audio/           # Beamforming and audio processing
-├── scripts/         # Installation and utilities
-├── services/        # Systemd integration
-├── docs/            # Documentation
-└── examples/        # Usage examples
+```bash
+yay -S libfreenect2-git   # fails at build; leaves the sources in place
+cd ~/.cache/yay/libfreenect2-git
+grep -rl CL_ICDL_VERSION src/libfreenect2/src | xargs sed -i 's/CL_ICDL_VERSION/ICDL_VERSION_LOCAL/g'
+CMAKE_POLICY_VERSION_MINIMUM=3.5 makepkg -ef
+sudo pacman -U libfreenect2-git-*.pkg.tar.zst
 ```
 
-## 🎯 Why This Project?
+Remove any older copy in `/usr/local/include/libfreenect2` and `/usr/local/lib/libfreenect2.so*`, or the compiler will pick up the stale headers. (Ubuntu/Debian: build from source as in the original `scripts/install-kinect-v2.sh`.)
 
-Existing Kinect v2 Linux support is fragmented:
-- **libfreenect2** - Great for developers, but no easy webcam setup
-- **No audio processing** - Microphone array potential wasted
-- **Complex setup** - Multiple manual steps required
-- **No integration** - Doesn't "just work" with apps
+**3. Virtual cameras**
 
-This project brings it all together in one easy-to-use package.
+```bash
+echo 'options v4l2loopback devices=4 video_nr=10,11,12,13 card_label="Kinect RGB,Kinect Depth,Kinect Cloud,Kinect IR" exclusive_caps=1,1,1,1' | sudo tee /etc/modprobe.d/kinect-vcams.conf
+echo v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf
+sudo modprobe -r v4l2loopback; sudo modprobe v4l2loopback   # close apps using the cameras first
+```
 
-## 🚧 Development Status
+**4. USB power-off rule** (lets the sensor suspend when idle so the LEDs go off)
 
-### ✅ Completed
-- Camera as V4L2 webcam device
-- Systemd service integration
-- Basic audio capture
-- Installation scripts
+```bash
+echo 'ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="045e", ATTR{idProduct}=="02c4", TEST=="power/control", ATTR{power/control}="auto", ATTR{power/autosuspend_delay_ms}="2000"' | sudo tee /etc/udev/rules.d/66-kinect2-autosuspend.rules
+sudo udevadm control --reload-rules
+```
 
-### 🔄 In Progress
-- Software beamforming implementation
-- Audio enhancement pipeline
-- GUI configuration tool
+**5. Build the streamer**
 
-### 📋 Planned
-- Depth camera access
-- Skeletal tracking
-- ROS integration
-- GPU acceleration
+```bash
+cd camera && g++ -O2 -o kinect2v4l2_multi kinect2v4l2_multi.cpp -lfreenect2
+```
 
-## 🤝 Contributing
+**6. Microphone** (`~/.config/pipewire/pipewire.conf.d/kinect-mic.conf`; replace the serial in `target.object` with yours from `pactl list short sources | grep NUI`, then `systemctl --user restart pipewire pipewire-pulse wireplumber`)
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+```
+context.modules = [
+  { name = libpipewire-module-filter-chain
+    args = {
+      node.description = "Kinect Mic"
+      media.name = "Kinect Mic"
+      filter.graph = {
+        nodes = [
+          { type = builtin name = mix label = mixer control = { "Gain 1" = 8 "Gain 2" = 8 "Gain 3" = 8 "Gain 4" = 8 } }
+        ]
+        inputs = [ "mix:In 1" "mix:In 2" "mix:In 3" "mix:In 4" ]
+        outputs = [ "mix:Out" ]
+      }
+      capture.props = {
+        node.name = "capture.kinect_mic"
+        audio.rate = 16000
+        audio.channels = 4
+        audio.position = [ FL FR FC LFE ]
+        target.object = "alsa_input.usb-Microsoft_Xbox_NUI_Sensor_<SERIAL>-02.analog-surround-40"
+        node.passive = true
+      }
+      playback.props = {
+        node.name = "kinect_mic"
+        media.class = Audio/Source
+        audio.rate = 16000
+        audio.channels = 1
+        audio.position = [ MONO ]
+      }
+    }
+  }
+]
+```
 
-Areas we need help:
-- Testing on different Linux distributions
-- Optimizing beamforming algorithms
-- Documentation and tutorials
-- GUI development
+## Use
 
-## 📚 Documentation
+```bash
+python tray/kinect-tray.py
+```
 
-- [Installation Guide](docs/INSTALL.md)
-- [Camera Setup](docs/CAMERA.md)
-- [Audio Processing](docs/AUDIO.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Technical Details](docs/TECHNICAL.md)
+Select "Kinect RGB / Depth / Cloud / IR" as video sources and "Kinect Mic" as audio in OBS, Zoom, browsers, etc. Add the script to KDE Autostart to have it at login. Use Quit (or Stop) to power the sensor down.
 
-## 🔗 Related Projects
+## Troubleshooting
 
-- [libfreenect2](https://github.com/OpenKinect/libfreenect2) - Core Kinect v2 driver
-- [pyroomacoustics](https://github.com/LCAV/pyroomacoustics) - Beamforming algorithms
-- [v4l2loopback](https://github.com/umlaeute/v4l2loopback) - Virtual camera support
+| Problem | Fix |
+|---|---|
+| Crash or frozen video with VA-API errors (`vaGetImage`, `vaCreateImage`) | Run with `LIBVA_DRIVER_NAME=nonexistent` (the tray does this). For the viewer: `env LIBVA_DRIVER_NAME=nonexistent Protonect cl` |
+| Segfault when stopping the original `kinect2v4l2` | The original `delete pipeline;` double-frees; it is removed here |
+| Logo LED stays on after stopping | Step 4 rule missing, or an app still has the mic open (e.g. OBS minimized to tray). Quit it |
+| `LIBUSB_ERROR_IO` / "No Kinect device found" after suspend | Re-authorize: `echo 0 \| sudo tee /sys/bus/usb/devices/<port>/authorized`, wait 2 s, write `1` |
+| `modprobe -r v4l2loopback` says in use | Find holders with `sudo fuser -v /dev/video1*` and close them |
+| `Kinect IR/Mixed/...` entries in OBS that do nothing | Leftovers from older configs; reload the module with the settings from step 3 |
+| Cloud/Depth show trails | Temporal smoothing trades a little latency for less flicker |
 
-## 📄 License
+## Layout
 
-MIT License - see [LICENSE](LICENSE) for details.
+```
+camera/   kinect2v4l2_multi.cpp (RGB+Depth+Cloud+IR), kinect2v4l2.cpp (original RGB-only)
+tray/     kinect-tray.py
+audio/    original test scripts
+docs/     original notes (beamforming roadmap, troubleshooting)
+```
 
-## 🙏 Acknowledgments
+## Status
 
-- OpenKinect community for libfreenect2
-- Linux audio/video community
-- Everyone who's struggled with Kinect on Linux
+Working: 4 cameras, boosted mic, tray control, LED power-off. Planned: installer script, shipped config files, autostart entry, adjustable colormap and cloud settings, beamforming (see `docs/BEAMFORMING-ROADMAP.md`).
 
----
+## License
 
-**Note**: This project is not affiliated with Microsoft. Kinect is a trademark of Microsoft Corporation.
+MIT, as in the original project. Not affiliated with Microsoft; Kinect is a trademark of Microsoft Corporation.
