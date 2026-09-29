@@ -1,0 +1,156 @@
+#include <libfreenect2/config.h>
+#include <libfreenect2/libfreenect2.hpp>
+#include <libfreenect2/frame_listener_impl.h>
+#include <libfreenect2/registration.h>
+#include <libfreenect2/packet_pipeline.h>
+#include <iostream>
+#include <signal.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <linux/videodev2.h>
+#include <cstring>
+#include <cstdint>
+#include <cmath>
+#include <vector>
+#include <algorithm>
+
+static volatile bool stop_flag = false;
+static void sighandler(int) { stop_flag = true; }
+
+static int openOut(const char *path, int w, int h) {
+    int fd = open(path, O_RDWR);
+    if (fd < 0) { std::cerr << "Failed to open " << path << std::endl; return -1; }
+    v4l2_format fmt;
+    memset(&fmt, 0, sizeof(fmt));
+    fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+    fmt.fmt.pix.width = w;
+    fmt.fmt.pix.height = h;
+    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUV420;
+    fmt.fmt.pix.bytesperline = w;
+    fmt.fmt.pix.sizeimage = w * h * 3 / 2;
+    fmt.fmt.pix.field = V4L2_FIELD_NONE;
+    if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0) { std::cerr << "Failed to set format on " << path << std::endl; close(fd); return -1; }
+    return fd;
+}
+
+static void bgrxToYuv420(const uint8_t *s, int w, int h, uint8_t *out) {
+    uint8_t *Y = out;
+    uint8_t *U = out + w * h;
+    uint8_t *V = U + (w * h) / 4;
+    for (int j = 0; j < h; j++) {
+        for (int i = 0; i < w; i++) {
+            int idx = (j * w + i) * 4;
+            int b = s[idx], g = s[idx + 1], r = s[idx + 2];
+            Y[j * w + i] = ((66 * r + 129 * g + 25 * b + 128) >> 8) + 16;
+            if (!(j & 1) && !(i & 1)) {
+                int k = (j / 2) * (w / 2) + i / 2;
+                U[k] = ((-38 * r - 74 * g + 112 * b + 128) >> 8) + 128;
+                V[k] = ((112 * r - 94 * g - 18 * b + 128) >> 8) + 128;
+            }
+        }
+    }
+}
+
+static float clamp01(float v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+static void viridis(float t, uint8_t *p) { static const float K[5][3] = {{68,1,84},{59,82,139},{33,145,140},{94,201,98},{253,231,37}}; t = clamp01(t) * 4.0f; int i = (int)t; if (i > 3) i = 3; float f = t - i; p[2] = (uint8_t)(K[i][0] + (K[i+1][0] - K[i][0]) * f); p[1] = (uint8_t)(K[i][1] + (K[i+1][1] - K[i][1]) * f); p[0] = (uint8_t)(K[i][2] + (K[i+1][2] - K[i][2]) * f); }
+
+int main(int argc, char *argv[]) {
+    const char *pRgb = argc > 1 ? argv[1] : "/dev/video10";
+    const char *pDepth = argc > 2 ? argv[2] : "/dev/video11";
+    const char *pCloud = argc > 3 ? argv[3] : "/dev/video12";
+    const int CW = 1920, CH = 1080, DW = 512, DH = 424, PW = 640, PH = 480;
+
+    int fdRgb = openOut(pRgb, CW, CH);
+    int fdDepth = openOut(pDepth, DW, DH);
+    int fdCloud = openOut(pCloud, PW, PH);
+    if (fdRgb < 0 || fdDepth < 0 || fdCloud < 0) return 1;
+
+    libfreenect2::Freenect2 freenect2;
+    if (freenect2.enumerateDevices() == 0) { std::cerr << "No Kinect device found!" << std::endl; return 1; }
+    std::string serial = freenect2.getDefaultDeviceSerialNumber();
+    libfreenect2::PacketPipeline *pipeline = new libfreenect2::OpenCLPacketPipeline();
+    libfreenect2::Freenect2Device *dev = freenect2.openDevice(serial, pipeline);
+    if (!dev) { std::cerr << "Failed to open Kinect device!" << std::endl; return 1; }
+
+    libfreenect2::SyncMultiFrameListener listener(libfreenect2::Frame::Color | libfreenect2::Frame::Depth);
+    libfreenect2::FrameMap frames;
+    dev->setColorFrameListener(&listener);
+    dev->setIrAndDepthFrameListener(&listener);
+    if (!dev->start()) { std::cerr << "Failed to start Kinect!" << std::endl; return 1; }
+
+    libfreenect2::Registration *reg = new libfreenect2::Registration(dev->getIrCameraParams(), dev->getColorCameraParams());
+    libfreenect2::Frame undistorted(DW, DH, 4), registered(DW, DH, 4);
+
+    signal(SIGINT, sighandler);
+    signal(SIGTERM, sighandler);
+    std::cout << "Streaming RGB " << pRgb << ", Depth " << pDepth << ", Cloud " << pCloud << std::endl;
+
+    std::vector<uint8_t> yuvRgb(CW * CH * 3 / 2), yuvDepth(DW * DH * 3 / 2), yuvCloud(PW * PH * 3 / 2);
+    std::vector<uint8_t> depthImg(DW * DH * 4), cloudImg(PW * PH * 4);
+    std::vector<float> zbuf(PW * PH);
+    long frameNo = 0;
+
+    while (!stop_flag) {
+        if (!listener.waitForNewFrame(frames, 10 * 1000)) { std::cerr << "Timeout waiting for frames" << std::endl; continue; }
+        libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];
+        libfreenect2::Frame *depth = frames[libfreenect2::Frame::Depth];
+
+        bgrxToYuv420(rgb->data, CW, CH, yuvRgb.data());
+        if (write(fdRgb, yuvRgb.data(), yuvRgb.size()) < 0) std::cerr << "RGB write failed" << std::endl;
+
+        const float *dd = reinterpret_cast<const float *>(depth->data);
+        for (int i = 0; i < DW * DH; i++) {
+            float d = dd[i];
+            uint8_t *p = &depthImg[i * 4];
+            if (!(d > 0.0f) || std::isnan(d) || std::isinf(d)) { p[0] = p[1] = p[2] = 0; p[3] = 255; continue; }
+            float t = 1.0f - clamp01((d - 500.0f) / 4000.0f);
+            viridis(t, p);
+            p[3] = 255;
+        }
+        bgrxToYuv420(depthImg.data(), DW, DH, yuvDepth.data());
+        if (write(fdDepth, yuvDepth.data(), yuvDepth.size()) < 0) std::cerr << "Depth write failed" << std::endl;
+
+        reg->apply(rgb, depth, &undistorted, &registered);
+        std::fill(cloudImg.begin(), cloudImg.end(), 0);
+        std::fill(zbuf.begin(), zbuf.end(), 1e9f);
+        float ang = 0.5f * std::sin(frameNo * 0.02f);
+        float ca = std::cos(ang), sa = std::sin(ang);
+        for (int r = 0; r < DH; r++) {
+            for (int c = 0; c < DW; c++) {
+                float x, y, z, rgbf;
+                reg->getPointXYZRGB(&undistorted, &registered, r, c, x, y, z, rgbf);
+                if (std::isnan(z) || !(z > 0.0f)) continue;
+                const uint8_t *cp = reinterpret_cast<const uint8_t *>(&rgbf);
+                float px = x, pz = z - 1.0f;
+                float xr = px * ca + pz * sa;
+                float zr = -px * sa + pz * ca + 1.0f;
+                if (zr < 0.3f) continue;
+                int u = (int)(PW / 2 + 520.0f * xr / zr);
+                int v = (int)(PH / 2 + 520.0f * y / zr);
+                for (int dy = 0; dy < 2; dy++) {
+                    for (int dx = 0; dx < 2; dx++) {
+                        int uu = u + dx, vv = v + dy;
+                        if (uu < 0 || uu >= PW || vv < 0 || vv >= PH) continue;
+                        int k = vv * PW + uu;
+                        if (zr < zbuf[k]) {
+                            zbuf[k] = zr;
+                            cloudImg[k * 4] = cp[0];
+                            cloudImg[k * 4 + 1] = cp[1];
+                            cloudImg[k * 4 + 2] = cp[2];
+                        }
+                    }
+                }
+            }
+        }
+        bgrxToYuv420(cloudImg.data(), PW, PH, yuvCloud.data());
+        if (write(fdCloud, yuvCloud.data(), yuvCloud.size()) < 0) std::cerr << "Cloud write failed" << std::endl;
+
+        frameNo++;
+        listener.release(frames);
+    }
+
+    dev->stop();
+    dev->close();
+    return 0;
+}

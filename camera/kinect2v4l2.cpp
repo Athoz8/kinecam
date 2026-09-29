@@ -136,7 +136,6 @@ int main(int argc, char *argv[]) {
     dev->stop();
     dev->close();
     close(fd);
-    delete pipeline;
 
     return 0;
 }
