@@ -147,3 +147,7 @@ secret*
 credentials*
 *_KEY
 *_TOKEN
+camera/kinect2v4l2
+camera/kinect2v4l2_multi
+*.bak*
+audio-tests/
