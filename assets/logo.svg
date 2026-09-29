@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="OpenKinect v2 logo">
+  <defs>
+    <linearGradient id="depth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fde725"/>
+      <stop offset="0.25" stop-color="#5ec962"/>
+      <stop offset="0.5" stop-color="#21918c"/>
+      <stop offset="0.75" stop-color="#3b528b"/>
+      <stop offset="1" stop-color="#440154"/>
+    </linearGradient>
+    <clipPath id="tile"><rect width="256" height="256" rx="48"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="256" height="256" fill="#151922"/>
+    <!-- depth cone -->
+    <polygon points="128,150 30,256 226,256" fill="url(#depth)" opacity="0.9"/>
+    <!-- depth scan lines -->
+    <g stroke="#151922" stroke-width="3" opacity="0.55" fill="none">
+      <path d="M96 190 Q128 176 160 190"/>
+      <path d="M78 212 Q128 192 178 212"/>
+      <path d="M60 234 Q128 208 196 234"/>
+    </g>
+    <!-- sensor bar -->
+    <rect x="24" y="72" width="208" height="84" rx="24" fill="#2a3040" stroke="#4d566e" stroke-width="4"/>
+    <!-- RGB lens -->
+    <circle cx="72" cy="114" r="24" fill="#0b0d12" stroke="#5b6785" stroke-width="4"/>
+    <circle cx="72" cy="114" r="11" fill="#1d2a4a"/>
+    <circle cx="66" cy="108" r="4" fill="#8fb4ff" opacity="0.8"/>
+    <!-- IR lenses -->
+    <circle cx="140" cy="114" r="15" fill="#0b0d12" stroke="#5b6785" stroke-width="3"/>
+    <circle cx="140" cy="114" r="6" fill="#5a1230"/>
+    <circle cx="188" cy="114" r="15" fill="#0b0d12" stroke="#5b6785" stroke-width="3"/>
+    <circle cx="188" cy="114" r="6" fill="#5a1230"/>
+    <!-- status LED -->
+    <circle cx="106" cy="114" r="4" fill="#5ec962"/>
+  </g>
+</svg>

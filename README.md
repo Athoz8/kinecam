@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" width="128" alt="OpenKinect v2 logo"></p>
+
 # OpenKinect v2 (tray edition)
 
 Use an Xbox One Kinect (v2) on Linux as virtual webcams and a boosted microphone. A tray icon starts and stops everything, and stopping powers the sensor down (IR and logo LEDs off).
