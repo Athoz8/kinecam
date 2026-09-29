@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# openkinect-v2 installer (Arch / CachyOS). Safe to run again.
+# Kinecam installer (Arch / CachyOS). Safe to run again.
 # Usage: ./install.sh [--autostart]
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD="$HOME/.cache/openkinect-v2-build"
+BUILD="$HOME/.cache/kinecam-build"
 AUTOSTART=0
 if [ "${1:-}" = "--autostart" ]; then AUTOSTART=1; fi
 

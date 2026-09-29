@@ -1,6 +1,6 @@
-<p align="center"><img src="assets/logo.svg" width="128" alt="OpenKinect v2 logo"></p>
+<p align="center"><img src="assets/logo.svg" width="128" alt="Kinecam logo"></p>
 
-# OpenKinect v2 (tray edition)
+# Kinecam
 
 Use an Xbox One Kinect (v2) on Linux as virtual webcams and a boosted microphone. A tray icon starts and stops everything, and stopping powers the sensor down (IR and logo LEDs off).
 
@@ -32,8 +32,8 @@ Fork of [BenGWeeks/openkinect-v2](https://github.com/BenGWeeks/openkinect-v2), w
 ### Quick (Arch / CachyOS)
 
 ```bash
-git clone https://github.com/Athoz8/openkinect-v2.git ~/openkinect-v2
-cd ~/openkinect-v2 && ./install.sh   # add --autostart to start the tray at login
+git clone https://github.com/Athoz8/kinecam.git ~/kinecam
+cd ~/kinecam && ./install.sh   # add --autostart to start the tray at login
 ```
 
 Plug in the Kinect (USB 3.0) first so the mic filter can be created. The script installs packages, builds libfreenect2 with the fixes below, sets up the virtual cameras, the USB power-off rule and the mic filter, builds the streamer and creates the `kinect-tray` launcher. It is safe to run again. If it stops because the running kernel has no modules left after an update, reboot and run it again.
