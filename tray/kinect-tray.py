@@ -4,7 +4,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
-BIN = Path.home() / "openkinect-v2/camera/kinect2v4l2_multi"
+BIN = Path(__file__).resolve().parent.parent / "camera" / "kinect2v4l2_multi"
 DEVS = ["/dev/video10", "/dev/video11", "/dev/video12", "/dev/video13"]
 
 
