@@ -25,7 +25,18 @@ Fork of [BenGWeeks/openkinect-v2](https://github.com/BenGWeeks/openkinect-v2), w
 - v4l2loopback, kernel headers matching your running kernel, PipeWire, Python 3, PyQt6
 - Tested on CachyOS (Arch), KDE Plasma, Wayland. Other distros should work but are untested.
 
-## Install (Arch / CachyOS)
+## Install
+
+### Quick (Arch / CachyOS)
+
+```bash
+git clone https://github.com/Athoz8/openkinect-v2.git ~/openkinect-v2
+cd ~/openkinect-v2 && ./install.sh   # add --autostart to start the tray at login
+```
+
+Plug in the Kinect (USB 3.0) first so the mic filter can be created. The script installs packages, builds libfreenect2 with the fixes below, sets up the virtual cameras, the USB power-off rule and the mic filter, builds the streamer and creates the `kinect-tray` launcher. It is safe to run again. If it stops because the running kernel has no modules left after an update, reboot and run it again.
+
+### Manual steps
 
 **1. Packages** (use your kernel's headers, e.g. `linux-cachyos-headers`; check with `uname -r`)
 
@@ -106,10 +117,10 @@ context.modules = [
 ## Use
 
 ```bash
-python tray/kinect-tray.py
+kinect-tray   # or open Kinect Tray from the application menu
 ```
 
-Select "Kinect RGB / Depth / Cloud / IR" as video sources and "Kinect Mic" as audio in OBS, Zoom, browsers, etc. Add the script to KDE Autostart to have it at login. Use Quit (or Stop) to power the sensor down.
+Select "Kinect RGB / Depth / Cloud / IR" as video sources and "Kinect Mic" as audio in OBS, Zoom, browsers, etc. Run `./install.sh --autostart` to start it at login. Use Quit (or Stop) to power the sensor down.
 
 ## Troubleshooting
 
@@ -128,13 +139,14 @@ Select "Kinect RGB / Depth / Cloud / IR" as video sources and "Kinect Mic" as au
 ```
 camera/   kinect2v4l2_multi.cpp (RGB+Depth+Cloud+IR), kinect2v4l2.cpp (original RGB-only)
 tray/     kinect-tray.py
+install.sh  installer (Arch / CachyOS)
 audio/    original test scripts
 docs/     original notes (beamforming roadmap, troubleshooting)
 ```
 
 ## Status
 
-Working: 4 cameras, boosted mic, tray control, LED power-off. Planned: installer script, shipped config files, autostart entry, adjustable colormap and cloud settings, beamforming (see `docs/BEAMFORMING-ROADMAP.md`).
+Working: 4 cameras, boosted mic, tray control, LED power-off. Planned: other distros and GPUs in install.sh, adjustable colormap and cloud settings, beamforming (see `docs/BEAMFORMING-ROADMAP.md`).
 
 ## License
 
