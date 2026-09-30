@@ -1,7 +1,7 @@
 import os, signal, subprocess, sys
 from pathlib import Path
-from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QAction, QColor, QIcon, QImage, QPainter, QPixmap
 from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 BIN = Path(__file__).resolve().parent.parent / "camera" / "kinect2v4l2_multi"
@@ -22,12 +22,28 @@ def make_icon(color):
     return QIcon(pm)
 
 
+LOGO = Path(__file__).resolve().parent.parent / "assets" / "logo.png"
+
+
+def load_icons():
+    pm = QPixmap(str(LOGO))
+    if pm.isNull():
+        return make_icon("#2ecc71"), make_icon("#7f8c8d")
+    pm = pm.scaled(128, 128, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    img = pm.toImage().convertToFormat(QImage.Format.Format_ARGB32)
+    for y in range(img.height()):
+        for x in range(img.width()):
+            c = img.pixelColor(x, y)
+            g = int(0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue())
+            img.setPixelColor(x, y, QColor(g, g, g, int(c.alpha() * 0.6)))
+    return QIcon(pm), QIcon(QPixmap.fromImage(img))
+
+
 class Tray:
     def __init__(self, app):
         self.app = app
         self.proc = None
-        self.on_icon = make_icon("#2ecc71")
-        self.off_icon = make_icon("#7f8c8d")
+        self.on_icon, self.off_icon = load_icons()
         self.tray = QSystemTrayIcon(self.off_icon)
         self.menu = QMenu()
         self.toggle = QAction("Start Kinect cameras")

@@ -36,7 +36,7 @@ git clone https://github.com/Athoz8/kinecam.git ~/kinecam
 cd ~/kinecam && ./install.sh   # add --autostart to start the tray at login
 ```
 
-Plug in the Kinect (USB 3.0) first so the mic filter can be created. The script installs packages, builds libfreenect2 with the fixes below, sets up the virtual cameras, the USB power-off rule and the mic filter, builds the streamer and creates the `kinect-tray` launcher. It is safe to run again. If it stops because the running kernel has no modules left after an update, reboot and run it again.
+Plug in the Kinect (USB 3.0) first so the mic filter can be created. The script installs packages, builds libfreenect2 with the fixes below, sets up the virtual cameras, the USB power-off rule and the mic filter, builds the streamer and creates the `kinecam` launcher. It is safe to run again. If it stops because the running kernel has no modules left after an update, reboot and run it again.
 
 ### Manual steps
 
@@ -121,7 +121,7 @@ context.modules = [
 ## Use
 
 ```bash
-kinect-tray   # or open Kinect Tray from the application menu
+kinecam   # or open Kinecam from the application menu
 ```
 
 Select "Kinect RGB / Depth / Cloud / IR" as video sources and "Kinect Mic" as audio in OBS, Zoom, browsers, etc. Run `./install.sh --autostart` to start it at login. Use Quit (or Stop) to power the sensor down.

@@ -119,30 +119,32 @@ EOF
 fi
 
 say "Tray launcher"
+if [ -f "$HOME/.config/autostart/kinect-tray.desktop" ]; then AUTOSTART=1; fi
+rm -f "$HOME/.local/bin/kinect-tray" "$HOME/.local/share/applications/kinect-tray.desktop" "$HOME/.config/autostart/kinect-tray.desktop"
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
-cat > "$HOME/.local/bin/kinect-tray" <<EOF
+cat > "$HOME/.local/bin/kinecam" <<EOF
 #!/usr/bin/env bash
 export LIBVA_DRIVER_NAME=nonexistent
 exec python "$REPO/tray/kinect-tray.py" "\$@"
 EOF
-chmod +x "$HOME/.local/bin/kinect-tray"
-cat > "$HOME/.local/share/applications/kinect-tray.desktop" <<EOF
+chmod +x "$HOME/.local/bin/kinecam"
+cat > "$HOME/.local/share/applications/kinecam.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Kinect Tray
+Name=Kinecam
 Comment=Start and stop the Kinect v2 virtual cameras
-Exec=$HOME/.local/bin/kinect-tray
-Icon=camera-web
+Exec=$HOME/.local/bin/kinecam
+Icon=$REPO/assets/logo.png
 Terminal=false
 Categories=AudioVideo;Video;
 EOF
 if [ "$AUTOSTART" -eq 1 ]; then
   mkdir -p "$HOME/.config/autostart"
-  cp "$HOME/.local/share/applications/kinect-tray.desktop" "$HOME/.config/autostart/kinect-tray.desktop"
+  cp "$HOME/.local/share/applications/kinecam.desktop" "$HOME/.config/autostart/kinecam.desktop"
   echo "Tray will start at login."
 fi
 
 say "Done"
-echo "Start the tray: run kinect-tray, or open Kinect Tray from the application menu."
+echo "Start the tray: run kinecam, or open Kinecam from the application menu."
 echo "Autostart at login: ./install.sh --autostart"
 echo "In apps, pick Kinect RGB / Depth / Cloud / IR as cameras and Kinect Mic as microphone."
