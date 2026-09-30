@@ -23,7 +23,7 @@ Fork of [BenGWeeks/openkinect-v2](https://github.com/BenGWeeks/openkinect-v2), w
 ## Requirements
 
 - Kinect v2 with its adapter, on a USB 3.0 port
-- NVIDIA GPU with OpenCL (tested: GTX 1060; CUDA not needed)
+- NVIDIA GPU with OpenCL (tested: GTX 1060, RTX 3060; CUDA not needed)
 - v4l2loopback, kernel headers matching your running kernel, PipeWire, Python 3, PyQt6
 - Tested on CachyOS (Arch), KDE Plasma, Wayland. Other distros should work but are untested.
 
@@ -43,9 +43,11 @@ Plug in the Kinect (USB 3.0) first so the mic filter can be created. The script 
 **1. Packages** (use your kernel's headers, e.g. `linux-cachyos-headers`; check with `uname -r`)
 
 ```bash
-sudo pacman -S --needed base-devel cmake v4l2loopback-dkms python-pyqt6 opencl-nvidia
 sudo pacman -Syu   # sync first, or headers may 404
+sudo pacman -S --needed base-devel cmake v4l2loopback-dkms python-pyqt6 opencl-nvidia
 ```
+
+If you use a legacy NVIDIA driver (e.g. `opencl-nvidia-580xx`), leave out `opencl-nvidia`; it conflicts with the legacy package. `install.sh` does this automatically.
 
 **2. libfreenect2** (AUR `libfreenect2-git` needs two fixes on current toolchains: CMake 4 rejects its old minimum version, and a local variable clashes with a macro in newer OpenCL headers)
 
