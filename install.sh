@@ -23,7 +23,11 @@ HEADERS="$(cat "/usr/lib/modules/$KVER/pkgbase")-headers"
 say "Installing packages ($HEADERS and dependencies)"
 PKGS=(base-devel git cmake "$HEADERS" v4l2loopback-dkms python-pyqt6)
 if command -v nvidia-smi >/dev/null; then
-  PKGS+=(opencl-nvidia)
+  if pacman -Qq | grep -q "^opencl-nvidia"; then
+    echo "NVIDIA OpenCL package already installed."
+  else
+    PKGS+=(opencl-nvidia)
+  fi
 else
   echo "No NVIDIA GPU detected: install an OpenCL runtime for your GPU (the depth stream needs OpenCL)."
 fi
