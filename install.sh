@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
 # Kinecam installer (Arch / CachyOS). Safe to run again.
-# Usage: ./install.sh [--autostart]
+# Usage: ./install.sh [--autostart] [--obs-camera]
+#   --autostart   start the tray at login
+#   --obs-camera  optional: also create an "OBS Virtual Camera" device (/dev/video20)
+#                 so OBS can start its virtual camera
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD="$HOME/.cache/kinecam-build"
 AUTOSTART=0
-if [ "${1:-}" = "--autostart" ]; then AUTOSTART=1; fi
+OBS_CAM=0
+for arg in "$@"; do
+  case "$arg" in
+    --autostart) AUTOSTART=1 ;;
+    --obs-camera) OBS_CAM=1 ;;
+    *) echo "Usage: ./install.sh [--autostart] [--obs-camera]" >&2; exit 1 ;;
+  esac
+done
 
 say() { printf "\n==> %s\n" "$*"; }
 die() { printf "ERROR: %s\n" "$*" >&2; exit 1; }
@@ -22,6 +32,7 @@ HEADERS="$(cat "/usr/lib/modules/$KVER/pkgbase")-headers"
 
 say "Installing packages ($HEADERS and dependencies)"
 PKGS=(base-devel git cmake "$HEADERS" v4l2loopback-dkms python-pyqt6)
+if [ "$OBS_CAM" -eq 1 ]; then PKGS+=(v4l2loopback-utils); fi
 if command -v nvidia-smi >/dev/null; then
   if pacman -Qq | grep -q "^opencl-nvidia"; then
     echo "NVIDIA OpenCL package already installed."
@@ -54,14 +65,35 @@ else
 fi
 
 say "Virtual cameras (v4l2loopback)"
+LOOP_N=4
+LOOP_NR="10,11,12,13"
+LOOP_LABELS="Kinect RGB,Kinect Depth,Kinect Cloud,Kinect IR"
+LOOP_CAPS="1,1,1,1"
+if [ "$OBS_CAM" -eq 1 ]; then
+  LOOP_N=5
+  LOOP_NR="$LOOP_NR,20"
+  LOOP_LABELS="$LOOP_LABELS,OBS Virtual Camera"
+  LOOP_CAPS="$LOOP_CAPS,1"
+fi
 sudo tee /etc/modprobe.d/kinect-vcams.conf >/dev/null <<EOF
-options v4l2loopback devices=4 video_nr=10,11,12,13 card_label="Kinect RGB,Kinect Depth,Kinect Cloud,Kinect IR" exclusive_caps=1,1,1,1
+options v4l2loopback devices=$LOOP_N video_nr=$LOOP_NR card_label="$LOOP_LABELS" exclusive_caps=$LOOP_CAPS
 EOF
 echo v4l2loopback | sudo tee /etc/modules-load.d/v4l2loopback.conf >/dev/null
 if sudo modprobe -r v4l2loopback 2>/dev/null; then
   sudo modprobe v4l2loopback
 else
   echo "v4l2loopback is in use. Close apps using cameras (OBS, browsers) and run: sudo modprobe -r v4l2loopback; sudo modprobe v4l2loopback"
+  if [ "$OBS_CAM" -eq 1 ] && [ ! -e /dev/video20 ]; then
+    if command -v v4l2loopback-ctl >/dev/null; then
+      if sudo v4l2loopback-ctl add -n "OBS Virtual Camera" -x 1 /dev/video20; then
+        echo "Added the OBS Virtual Camera device now (/dev/video20); the config keeps it after a reboot."
+      else
+        echo "Could not add the device live. It will appear after the module is reloaded or after a reboot."
+      fi
+    else
+      echo "v4l2loopback-ctl not found. The OBS Virtual Camera device appears after the module is reloaded or after a reboot."
+    fi
+  fi
 fi
 
 say "USB power-off rule (LEDs go off when idle)"
@@ -148,3 +180,4 @@ say "Done"
 echo "Start the tray: run kinecam, or open Kinecam from the application menu."
 echo "Autostart at login: ./install.sh --autostart"
 echo "In apps, pick Kinect RGB / Depth / Cloud / IR as cameras and Kinect Mic as microphone."
+if [ "$OBS_CAM" -eq 1 ]; then echo "OBS: use Start Virtual Camera. Other apps see it as OBS Virtual Camera (/dev/video20)."; fi

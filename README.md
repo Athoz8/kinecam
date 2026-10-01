@@ -33,8 +33,15 @@ Fork of [BenGWeeks/openkinect-v2](https://github.com/BenGWeeks/openkinect-v2), w
 
 ```bash
 git clone https://github.com/Athoz8/kinecam.git ~/kinecam
-cd ~/kinecam && ./install.sh   # add --autostart to start the tray at login
+cd ~/kinecam && ./install.sh
 ```
+
+Options (combine as needed):
+
+| Option | Effect |
+|---|---|
+| `--autostart` | Start the tray at login |
+| `--obs-camera` | Optional: also create an extra "OBS Virtual Camera" device so OBS can start its virtual camera (see [Optional: OBS Virtual Camera](#optional-obs-virtual-camera)) |
 
 Plug in the Kinect (USB 3.0) first so the mic filter can be created. The script installs packages, builds libfreenect2 with the fixes below, sets up the virtual cameras, the USB power-off rule and the mic filter, builds the streamer and creates the `kinecam` launcher. It is safe to run again. If it stops because the running kernel has no modules left after an update, reboot and run it again.
 
@@ -118,6 +125,36 @@ context.modules = [
 ]
 ```
 
+## Optional: OBS Virtual Camera
+
+Only needed if the OBS **Start Virtual Camera** button fails (it often shows just "Failed to start virtual camera"). OBS needs a loopback device of its own, and the four devices Kinecam creates are all taken by the Kinect streams, so OBS has nowhere to write. This adds a fifth, separate device (`/dev/video20`, "OBS Virtual Camera"). You do not need it to use the Kinect cameras as sources in OBS or other apps.
+
+```bash
+./install.sh --obs-camera
+```
+
+It is safe to run on an existing install. If the cameras are in use and the module cannot be reloaded, the device is added live instead and still comes back after a reboot.
+
+Manual steps:
+
+```bash
+sudo pacman -S v4l2loopback-utils
+sudo v4l2loopback-ctl add -n "OBS Virtual Camera" -x 1 /dev/video20   # live, until reboot
+v4l2-ctl --list-devices                                               # should list it
+```
+
+To keep it after a reboot, change `/etc/modprobe.d/kinect-vcams.conf` to the five-device line, then reload the module (close apps using the cameras first):
+
+```
+options v4l2loopback devices=5 video_nr=10,11,12,13,20 card_label="Kinect RGB,Kinect Depth,Kinect Cloud,Kinect IR,OBS Virtual Camera" exclusive_caps=1,1,1,1,1
+```
+
+If it still fails:
+
+- Check that `v4l2-ctl --list-devices` shows "OBS Virtual Camera".
+- Stop the Kinect streams, remove the Kinect sources from the scene and test with only a webcam; OBS may be picking `/dev/video10`.
+- Run `sudo dmesg | grep -i v4l2loopback | tail` right after a failed start; the kernel message usually names the reason.
+
 ## Use
 
 ```bash
@@ -137,6 +174,7 @@ Select "Kinect RGB / Depth / Cloud / IR" as video sources and "Kinect Mic" as au
 | `modprobe -r v4l2loopback` says in use | Find holders with `sudo fuser -v /dev/video1*` and close them |
 | `Kinect IR/Mixed/...` entries in OBS that do nothing | Leftovers from older configs; reload the module with the settings from step 3 |
 | Cloud/Depth show trails | Temporal smoothing trades a little latency for less flicker |
+| OBS says "Failed to start virtual camera" | Add the optional OBS Virtual Camera device: `./install.sh --obs-camera` (see above) |
 
 ## Layout
 
